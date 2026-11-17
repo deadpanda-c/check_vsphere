@@ -34,15 +34,6 @@ def run():
     parser.add_optional_arguments(CheckArgument.WARNING_THRESHOLD)
     parser.add_optional_arguments(CheckArgument.ALLOWED('regex, checked against <vm-name>'))
     parser.add_optional_arguments(CheckArgument.BANNED('regex, checked against <vm-name>'))
-    parser.add_optional_arguments({
-        'name_or_flags': ['--percent'],
-        'options': {
-            'action': 'store_true',
-            'default': False,
-            'help': 'thresholds apply to the MHz per vCPU as a percentage of '
-                    'the host core frequency instead of absolute MHz',
-        }
-    })
     args = parser.get_args()
 
     check = Check()
@@ -85,20 +76,20 @@ def run():
         per_vcpu = used_mhz / num_cpu
         value = per_vcpu
         uom = 'MHz'
-        text = f"{name}: {per_vcpu:.0f} MHz per vCPU ({num_cpu} vCPU, {used_mhz} MHz total)"
-
-        if args.percent:
-            core_mhz = host.summary.hardware.cpuMhz if host else None
-            if not core_mhz:
-                continue
-            value = per_vcpu / core_mhz * 100
-            uom = '%'
-            text = f"{name}: {value:.1f}% of host core frequency ({per_vcpu:.0f} of {core_mhz} MHz)"
+        expected_result = (num_cpu * 2) * 1000
+        is_freq_ok = True if value <= expected_result else False
+        percent_value = used_mhz / expected_result * 100
+        uom = '%'
+        if (num_cpu * 2) != expected_result / 1000:
+            check.exit(Status.CRITICAL, "Number of vCPU doesn't match the frequence")
+        text = f"{name}: {"OK" if is_freq_ok else "KO"} - {used_mhz} / {expected_result} ({percent_value:.1f}%)"
+        if used_mhz > expected_result:
+            check.exit(Status.CRITICAL, f"{name}: Frequences max reached !")
 
         seen += 1
         check.add_perfdata(
-            label=f"{name} cpu_mhz_per_vcpu" if not args.percent else f"{name} cpu_freq_pct",
-            value=round(value, 2),
+            label=f"{name} cpu_mhz_per_vcpu",
+            value=round(percent_value, 2),
             uom=uom,
             threshold=check.threshold,
         )
