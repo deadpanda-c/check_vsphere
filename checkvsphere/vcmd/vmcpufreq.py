@@ -83,8 +83,6 @@ def run():
         if (num_cpu * 2) != expected_result / 1000:
             check.exit(Status.CRITICAL, "Number of vCPU doesn't match the frequence")
         text = f"{name}: {"OK" if is_freq_ok else "KO"} - {used_mhz} / {expected_result} ({percent_value:.1f}%)"
-        if used_mhz > expected_result:
-            check.exit(Status.CRITICAL, f"{name}: Frequences max reached !")
 
         seen += 1
         check.add_perfdata(
@@ -94,6 +92,8 @@ def run():
             threshold=check.threshold,
         )
         check.add_message(check.threshold.get_status(value), text)
+        if used_mhz > expected_result:
+            check.exit(Status.CRITICAL, f"{name}: Frequences max reached !")
 
     if seen == 0:
         check.exit(Status.WARNING, "no powered-on VM with CPU statistics found")
