@@ -51,6 +51,7 @@ def run():
             'runtime.host',
             'config.hardware.numCPU',
             'summary.quickStats.overallCpuUsage',
+            'runtime.maxCpuUsage',
         ],
     )
 
@@ -77,12 +78,14 @@ def run():
         value = per_vcpu
         uom = 'MHz'
         expected_result = (num_cpu * 2) * 1000
-        is_freq_ok = True if value <= expected_result else False
-        percent_value = used_mhz / expected_result * 100
+        max_mhz = props.get('runtime.maxCpuUsage')
+        if used_mhz is None or not max_mhz:
+            continue
+        is_freq_ok = True if value <= max_mhz else False
+        is_freq_ok = False if max_mhz / 2000 != num_cpu else is_freq_ok
+        percent_value = used_mhz / max_mhz * 100
         uom = '%'
-        if (num_cpu * 2) != expected_result / 1000:
-            check.exit(Status.CRITICAL, "Number of vCPU doesn't match the frequence")
-        text = f"{name}: {"OK" if is_freq_ok else "KO"} - {used_mhz} / {expected_result} ({percent_value:.1f}%)"
+        text = f"{name}: {"OK" if is_freq_ok else "KO"} - {used_mhz} / {max_mhz} ({percent_value:.1f}%)"
 
         seen += 1
         check.add_perfdata(
@@ -92,7 +95,7 @@ def run():
             threshold=check.threshold,
         )
         check.add_message(check.threshold.get_status(value), text)
-        if used_mhz > expected_result:
+        if used_mhz > max_mhz:
             check.exit(Status.CRITICAL, f"{name}: Frequences max reached !")
 
     if seen == 0:
